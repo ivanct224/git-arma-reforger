@@ -1,0 +1,19 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Datos del sitio: los lee cualquiera, solo los administradores escriben.
+    // IMPORTANTE: reemplaza el correo por el de tu cuenta de administrador
+    // (la misma que creaste en Authentication). Puedes poner varios.
+    match /sitio/{doc} {
+      allow read: if true;
+      allow write: if request.auth != null
+                   && request.auth.token.email in ['TU_CORREO_ADMIN@gmail.com'];
+    }
+
+    // Todo lo demás, cerrado.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
