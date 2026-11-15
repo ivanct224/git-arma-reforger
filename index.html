@@ -252,6 +252,11 @@ table{border-collapse:collapse;width:100%}
 
 .hbtns{display:flex;gap:8px;flex-wrap:wrap}
 .photo img.av{filter:none}
+.photo .ph{aspect-ratio:240/300;background:#8e8b82 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 240 300' preserveAspectRatio='xMidYMid slice'%3E%3Crect width='240' height='300' fill='%238e8b82'/%3E%3Ccircle cx='120' cy='108' r='46' fill='%236c6960'/%3E%3Cpath d='M30 300c0-62 38-100 90-100s90 38 90 100z' fill='%236c6960'/%3E%3C/svg%3E") center/cover no-repeat}
+.photo.editable{cursor:pointer}
+.photo.editable:hover{outline:2px dashed var(--stamp)}
+.pbtns{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+.fphoto .stampbox{align-self:flex-start;margin-left:6px}
 .fphoto .btn{align-self:center}
 .lockwrap{display:flex;justify-content:center;padding:10px 0}
 .lock{max-width:520px;width:100%;padding:44px 30px 30px;display:flex;flex-direction:column;gap:14px;transform:rotate(-.6deg)}
@@ -555,6 +560,25 @@ function editor(title,build,onSave,onDelete,saveLabel){
 function delBtn(fn){const b=h('button',{class:'btn danger sp',onclick:()=>{if(b.dataset.s){fn()}else{b.dataset.s=1;b.textContent='Confirmar eliminación'}}},'Eliminar');return b}
 
 /* ---------- editores concretos ---------- */
+function pickPhoto(m){
+  const i=h('input',{type:'file',accept:'image/*'});
+  i.addEventListener('change',()=>{
+    const f=i.files[0];if(!f)return;
+    if(f.size>15e6){toast('La imagen es demasiado pesada (máx. 15 MB).');return}
+    const img=new Image(),u=URL.createObjectURL(f);
+    img.onload=()=>{
+      const W=240,H=300,c=document.createElement('canvas');c.width=W;c.height=H;const x=c.getContext('2d');
+      const k=Math.max(W/img.width,H/img.height),w=W/k,hh=H/k;   /* recorte centrado 4:5 */
+      x.fillStyle='#8e8b82';x.fillRect(0,0,W,H);
+      x.drawImage(img,(img.width-w)/2,(img.height-hh)/2,w,hh,0,0,W,H);
+      URL.revokeObjectURL(u);
+      mutate(()=>{m.foto=c.toDataURL('image/jpeg',0.78)},'Foto cargada (falta publicar)');
+    };
+    img.onerror=()=>{URL.revokeObjectURL(u);toast('No se pudo leer la imagen.')};
+    img.src=u;
+  });
+  i.click();
+}
 function editMember(m){
   const nuevo=!m; const cur=m||{id:'',nick:'',estado:'Activo',ingreso:new Date().toISOString().slice(0,10),rango:S.rangos.length-1,escalafon:null,pais:'Chile',misionesBase:0,diasBase:0,esp:{}};
   editor(nuevo?'Agregar integrante':'Editar '+cur.nick,f=>[
@@ -691,8 +715,14 @@ function fileSheet(m){
   const esp=Object.entries(m.esp||{});
   return h('article',{class:'sheet file'},
     h('div',{class:'fh'},h('img',{src:S.settings.logo,alt:'',width:44,height:44}),h('div',null,h('b',null,S.settings.siglas+' · Archivo de personal'),h('small',null,S.settings.nombre))),
-    h('div',{class:'frow'},h('span',{class:'badge'},ri.code),h('span',{class:'stampbox '+(m.estado==='Activo'?'':'off')},m.estado)),
-    h('table',{class:'dt'},h('tbody',null,row('Nick',m.nick),row('Grado',ri.name),row('Escalafón',m.escalafon?ESC[m.escalafon]:'Sin escalafón'),row('Fecha de ingreso',fmt(m.ingreso,true)),row('País',m.pais||'—'),row('Permanencia',(di||0)+' días'),row('Misiones oficiales',mis))),
+    h('div',{class:'fbody'},
+      h('div',{class:'fphoto'},
+        h('div',{class:'photo'+(admin?' editable':''),onclick:admin?()=>pickPhoto(m):null,title:admin?'Subir o cambiar foto':null},
+          m.foto?h('img',{class:'av',src:m.foto,alt:'Foto de '+m.nick}):h('div',{class:'ph',role:'img','aria-label':'Sin foto'}),
+          h('span',{class:'rk'},ri.code)),
+        h('span',{class:'stampbox '+(m.estado==='Activo'?'':'off')},m.estado),
+        admin?h('div',{class:'pbtns'},h('button',{class:'btn small',onclick:()=>pickPhoto(m)},m.foto?'Cambiar foto':'Subir foto'),m.foto?h('button',{class:'btn small',onclick:()=>mutate(()=>{delete m.foto},'Foto quitada (falta publicar)')},'Quitar foto'):null):null),
+      h('table',{class:'dt'},h('tbody',null,row('Nick',m.nick),row('Grado',ri.name),row('Escalafón',m.escalafon?ESC[m.escalafon]:'Sin escalafón'),row('Fecha de ingreso',fmt(m.ingreso,true)),row('País',m.pais||'—'),row('Permanencia',(di||0)+' días'),row('Misiones oficiales',mis)))),
     esp.length?h('div',{class:'fsec'},h('h5',null,'Especialidades'),h('div',{class:'tags'},esp.map(([e,d])=>h('span',null,e+(d?' · '+fmt(d):''))))):null,
     nx&&m.estado==='Activo'?h('div',{class:'fsec'},h('h5',null,'Próximo grado · '+nx[bb].c+' '+tcase(nx[bb].n)),bar('Asistencia oficial',mis,nx.asist),bar('Días de permanencia',di,nx.dias),
       (nx[bb].cur||nx.merito)?h('p',{class:'hint'},'También requiere: '+[nx[bb].cur?'curso '+tcase(nx[bb].cur):'',nx.merito?'mérito':''].filter(Boolean).join(' y ')+'.'):null):null,
